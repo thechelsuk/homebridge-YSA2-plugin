@@ -170,4 +170,4 @@ class YaleSyncPlatform implements DynamicPlatformPlugin {
 			}
 		}
 
-		export = YaleSyncPlatform;
+		export default YaleSyncPlatform;
