@@ -48,8 +48,6 @@ git clone https://github.com/thechelsuk/homebridge-yalesyncalarm-2.git
 npm install @thechelsuk/homebridge-yalesyncalarm-2@beta
 ```
 
-
-
 After running `npm install`, `npm` should automatically run `npm run build`, which runs `node_modules/typescript/bin/tsc` to compile the typescript files. If it doesn't then you can run either `node_modules/typescript/bin/tsc` or `npm run build`.
 
 There are useful configs already included for [prettier](https://prettier.io) and [Visual Studio Code](https://code.visualstudio.com).
