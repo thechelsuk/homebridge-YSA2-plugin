@@ -37,8 +37,18 @@ If you set `refreshInterval` to a value less than `1`. The automatic update is d
 ## Building from Source
 
 ```bash
-git clone https://github.com/thechelsuk/homebridge-yalesyncalarm-2.git && cd homebridge-yalesyncalarm-2 && npm install
+git clone https://github.com/thechelsuk/homebridge-yalesyncalarm-2.git
+&& cd homebridge-yalesyncalarm-2
+&& npm install
 ```
+
+### Running the beta version
+
+```bash
+npm install @thechelsuk/homebridge-yalesyncalarm-2@beta
+```
+
+
 
 After running `npm install`, `npm` should automatically run `npm run build`, which runs `node_modules/typescript/bin/tsc` to compile the typescript files. If it doesn't then you can run either `node_modules/typescript/bin/tsc` or `npm run build`.
 
