@@ -41,8 +41,10 @@ export class YaleApiClient {
     };
     Logger.info('[YaleApiClient] AUTH REQUEST');
     Logger.info('URL:', url);
-    Logger.info('Headers:', JSON.stringify(headers));
-    Logger.info('Body:', body);
+    // Redact password and token in logs
+    const safeHeaders = { ...headers, Authorization: headers.Authorization ? '[REDACTED]' : undefined };
+    Logger.info('Headers:', JSON.stringify(safeHeaders));
+    Logger.info('Body:', body.replace(/password=[^&]+/, 'password=[REDACTED]'));
     const resp = await fetch(url, {
       method: 'POST',
       headers,
@@ -51,7 +53,16 @@ export class YaleApiClient {
     Logger.info('[YaleApiClient] AUTH RESPONSE');
     Logger.info('Status:', resp.status, resp.statusText);
     const respText = await resp.text();
-    Logger.info('Response Body:', respText);
+    // Redact access_token if present
+    let safeRespText = respText;
+    try {
+      const respObj = JSON.parse(respText);
+      if (respObj && typeof respObj === 'object' && respObj.access_token) {
+        respObj.access_token = '[REDACTED]';
+        safeRespText = JSON.stringify(respObj);
+      }
+    } catch { /* ignore parse errors */ }
+    Logger.info('Response Body:', safeRespText);
     if (!resp.ok) {
       Logger.error('Failed to authenticate with Yale API', respText);
       throw new Error('Authentication failed');
