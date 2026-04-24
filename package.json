@@ -18,7 +18,7 @@
 	},
 	"repository": {
 		"type": "git",
-		"url": "git+https://github.com/thechelsuk/plugin-homebridge-YSA2.git"
+		"url": "git+https://github.com/thechelsuk/homebridge-YSA2-plugin.git"
 	},
 	"keywords": [
 		"homebridge",
@@ -30,9 +30,9 @@
 	"author": "thechelsuk",
 	"license": "MIT",
 	"bugs": {
-		"url": "https://github.com/thechelsuk/plugin-homebridge-YSA2/issues"
+		"url": "https://github.com/thechelsuk/homebridge-YSA2-plugin/issues"
 	},
-	"homepage": "https://github.com/thechelsuk/plugin-homebridge-YSA2#readme",
+	"homepage": "https://github.com/thechelsuk/homebridge-YSA2-plugin#readme",
 	"engines": {
 		"homebridge": "^1.6.0 || ^2.0.0",
 		"node": ">=16.19.1"
