@@ -118,6 +118,10 @@ export class YaleApiClient {
       throw new Error('Failed to fetch sensors');
     }
     const data = await resp.json();
+    if (!Array.isArray(data)) {
+      Logger.error('Expected array for sensors, got:', JSON.stringify(data));
+      throw new Error('Yale API: Unexpected response format for sensors');
+    }
     // Parse sensors
     const sensors: Sensor[] = [];
     for (const device of data) {
