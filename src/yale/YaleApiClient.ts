@@ -118,24 +118,25 @@ export class YaleApiClient {
       throw new Error('Failed to fetch sensors');
     }
     const data = await resp.json();
-    if (!Array.isArray(data)) {
+    const devices = Array.isArray(data) ? data : Array.isArray(data.data) ? data.data : null;
+    if (!devices) {
       Logger.error('Expected array for sensors, got:', JSON.stringify(data));
       throw new Error('Yale API: Unexpected response format for sensors');
     }
     // Parse sensors
     const sensors: Sensor[] = [];
-    for (const device of data) {
-      if (device.type === 'contact') {
+    for (const device of devices) {
+      if (device.type && device.type.includes('contact')) {
         sensors.push({
-          identifier: device.id,
+          identifier: device.device_id || device.id,
           name: device.name,
           state: device.status === 'open' ? ContactSensorState.Open : ContactSensorState.Closed,
         });
-      } else if (device.type === 'motion') {
+      } else if (device.type && device.type.includes('pir')) {
         sensors.push({
-          identifier: device.id,
+          identifier: device.device_id || device.id,
           name: device.name,
-          state: device.status === 'triggered' ? MotionSensorState.Triggered : MotionSensorState.None,
+          state: device.status1 === 'triggered' || device.status === 'triggered' ? MotionSensorState.Triggered : MotionSensorState.None,
         });
       }
     }
