@@ -246,4 +246,95 @@ describe('YaleSyncPlatform', () => {
       );
     });
   });
+
+  // ---- Helper: configure a real panel accessory and extract the 'set' handler ----
+  function setupPanelSetHandler() {
+    const platform = new YaleSyncPlatform(log, config, api);
+    const accessory = makePlatformAccessory('Yale Panel', 'uuid-panel-set');
+    accessory.context = { kind: 'panel', identifier: '1' };
+
+    const infoService = makeService('AccessoryInformation');
+    const secService = makeService('SecuritySystem');
+    accessory.getService = jest.fn((key: string) => {
+      if (key === Service.AccessoryInformation) return infoService;
+      if (key === Service.SecuritySystem) return secService;
+      return undefined;
+    }) as any;
+    accessory.addService = jest.fn() as any;
+
+    platform.configurePanel(accessory);
+
+    // Retrieve the 'set' handler from whichever characteristic had it registered.
+    // The platform passes Characteristic objects as keys; they stringify to '[object Object]',
+    // so we search all registered characteristics for the one with a 'set' call.
+    let setHandler: Function | undefined;
+    let currentStateCharacteristic: ReturnType<typeof makeCharacteristic> | undefined;
+    for (const char of Object.values(secService._characteristics)) {
+      const onMock = (char as any).on as jest.Mock;
+      const setCall = onMock.mock.calls.find((c: any[]) => c[0] === 'set');
+      if (setCall) {
+        setHandler = setCall[1];
+        currentStateCharacteristic = char as any;
+        break;
+      }
+    }
+    if (!setHandler || !currentStateCharacteristic) {
+      throw new Error('Could not find set handler on SecuritySystem characteristic');
+    }
+    return { platform, setHandler, currentStateCharacteristic };
+  }
+
+  describe('panel set handler', () => {
+    it('calls setPanelState with the correct mode and updates current state on success', async () => {
+      mockYale.setPanelState = jest.fn().mockResolvedValue({ identifier: '1', name: 'Yale Panel', state: PanelState.Armed });
+      const { setHandler, currentStateCharacteristic } = setupPanelSetHandler();
+
+      const callback = jest.fn();
+      // AWAY_ARM = 1
+      await setHandler(Characteristic.SecuritySystemTargetState.AWAY_ARM, callback, undefined);
+
+      expect(mockYale.setPanelState).toHaveBeenCalledWith(PanelState.Armed);
+      expect(callback).toHaveBeenCalledWith(null);
+      expect(currentStateCharacteristic.updateValue).toHaveBeenCalledWith(
+        Characteristic.SecuritySystemCurrentState.AWAY_ARM
+      );
+    });
+
+    it('calls callback with error and logs when setPanelState rejects', async () => {
+      const apiError = new Error('API failure');
+      mockYale.setPanelState = jest.fn().mockRejectedValue(apiError);
+      const { setHandler } = setupPanelSetHandler();
+
+      const callback = jest.fn();
+      await setHandler(Characteristic.SecuritySystemTargetState.AWAY_ARM, callback, undefined);
+
+      expect(callback).toHaveBeenCalledWith(apiError);
+      expect(log.error).toHaveBeenCalledWith(
+        expect.stringContaining('Set alarm failed'),
+        apiError,
+      );
+    });
+
+    it('does nothing and calls callback(null) when context is no_recurse', async () => {
+      mockYale.setPanelState = jest.fn();
+      const { setHandler } = setupPanelSetHandler();
+
+      const callback = jest.fn();
+      await setHandler(Characteristic.SecuritySystemTargetState.AWAY_ARM, callback, 'no_recurse');
+
+      expect(mockYale.setPanelState).not.toHaveBeenCalled();
+      expect(callback).toHaveBeenCalledWith(null);
+    });
+
+    it('logs the requested HomeKit target state and Yale mode before calling API', async () => {
+      mockYale.setPanelState = jest.fn().mockResolvedValue({ identifier: '1', name: 'Yale Panel', state: PanelState.Armed });
+      const { setHandler } = setupPanelSetHandler();
+
+      await setHandler(Characteristic.SecuritySystemTargetState.AWAY_ARM, jest.fn(), undefined);
+
+      expect(log.info).toHaveBeenCalledWith(
+        expect.stringMatching(/Set alarm requested.*away.*arm/i)
+      );
+    });
+  });
 });

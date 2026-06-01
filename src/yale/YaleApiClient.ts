@@ -72,10 +72,14 @@ export class YaleApiClient {
     }
     const data = await resp.json();
     const entry = Array.isArray(data.data) ? data.data[0] : data;
+    const rawMode: string = entry.mode ?? entry.state ?? '';
+    // Normalise: API sometimes returns 'arm_full'/'arm_partial' instead of 'arm'/'home'
+    const normalisedMode = rawMode === 'arm_full' ? 'arm' : rawMode === 'arm_partial' ? 'home' : rawMode;
+    Logger.info(`getPanel raw mode: '${rawMode}' -> normalised: '${normalisedMode}'`);
     return {
       identifier: '1',
       name: entry.name || 'Yale Panel',
-      state: entry.mode as PanelState,
+      state: normalisedMode as PanelState,
     };
   }
 
@@ -83,6 +87,7 @@ export class YaleApiClient {
     // Old plugin uses api/panel/mode endpoint (no panelId) and x-www-form-urlencoded body
     const url = BASE_URL + 'api/panel/mode/';
     const body = `area=1&mode=${state}`;
+    Logger.info(`setPanelState: sending mode='${state}' to ${url}`);
     const resp = await this.fetchWithAuth(url, {
       method: 'POST',
       body,
@@ -90,14 +95,21 @@ export class YaleApiClient {
         'Content-Type': 'application/x-www-form-urlencoded ; charset=utf-8',
       },
     });
+    const respText = await resp.text();
+    Logger.info(`setPanelState: HTTP ${resp.status}, response body: ${respText}`);
     if (!resp.ok) {
-      Logger.error('Failed to set panel state', await resp.text());
-      throw new Error('Failed to set panel state');
+      Logger.error('Failed to set panel state (non-2xx)', respText);
+      throw new Error(`Failed to set panel state (HTTP ${resp.status})`);
     }
-    const data = await resp.json();
+    let data: any;
+    try {
+      data = JSON.parse(respText);
+    } catch {
+      throw new Error(`Yale API returned non-JSON response: ${respText}`);
+    }
     // Yale API returns { "code": "000", ... } for success
     if (data.code !== '000') {
-      throw new Error(`Yale panel rejected state change: code=${data.code}`);
+      throw new Error(`Yale panel rejected state change: code=${data.code}, message=${data.message ?? ''}`);
     }
     return {
       identifier: '1',

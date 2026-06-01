@@ -265,18 +265,21 @@ class YaleSyncPlatform implements DynamicPlatformPlugin {
 						callback(new Error(`${pluginName} incorrectly configured`));
 						return;
 					}
-					if (context !== 'no_recurse') {
-						try {
-							const mode = await this._yale.setPanelState(targetStateToMode(this.Characteristic, targetState));
-							this._log.info(`Panel mode: ${mode.state}, HomeKit state: ${currentStateToString(this.Characteristic, modeToCurrentState(this.Characteristic, mode.state))}`);
-							securitySystem.getCharacteristic(this.Characteristic.SecuritySystemCurrentState)?.updateValue(modeToCurrentState(this.Characteristic, mode.state));
-							callback(null);
-						} catch (err) {
-							this._log.error('Failed to set panel state:', err);
-							callback(err instanceof Error ? err : new Error(String(err)));
-						}
-					} else {
+					if (context === 'no_recurse') {
+						// Triggered by our own setValue/updateValue call — ignore to avoid feedback loop
 						callback(null);
+						return;
+					}
+					const requestedMode = targetStateToMode(this.Characteristic, targetState);
+					this._log.info(`Set alarm requested: HomeKit targetState=${targetState} (${targetStateToString(this.Characteristic, targetState)}) -> Yale mode='${requestedMode}'`);
+					try {
+						const mode = await this._yale.setPanelState(requestedMode);
+						this._log.info(`Set alarm succeeded: Yale mode='${mode.state}', HomeKit current state=${currentStateToString(this.Characteristic, modeToCurrentState(this.Characteristic, mode.state))}`);
+						securitySystem.getCharacteristic(this.Characteristic.SecuritySystemCurrentState)?.updateValue(modeToCurrentState(this.Characteristic, mode.state));
+						callback(null);
+					} catch (err) {
+						this._log.error('Set alarm failed:', err);
+						callback(err instanceof Error ? err : new Error(String(err)));
 					}
 				});
 			this._accessories[accessory.UUID] = accessory;

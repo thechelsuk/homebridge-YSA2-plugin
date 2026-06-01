@@ -107,6 +107,26 @@ describe('getPanel', () => {
     const client = new YaleApiClient('u', 'p');
     await expect(client.getPanel()).rejects.toThrow('Failed to fetch panel state');
   });
+
+  it('normalises arm_full to PanelState.Armed', async () => {
+    mockFetch
+      .mockResolvedValueOnce(makeResponse(AUTH_RESPONSE))
+      .mockResolvedValueOnce(makeResponse({ data: [{ mode: 'arm_full', name: 'Panel' }] }));
+
+    const client = new YaleApiClient('u', 'p');
+    const panel = await client.getPanel();
+    expect(panel.state).toBe(PanelState.Armed);
+  });
+
+  it('normalises arm_partial to PanelState.Home', async () => {
+    mockFetch
+      .mockResolvedValueOnce(makeResponse(AUTH_RESPONSE))
+      .mockResolvedValueOnce(makeResponse({ data: [{ mode: 'arm_partial', name: 'Panel' }] }));
+
+    const client = new YaleApiClient('u', 'p');
+    const panel = await client.getPanel();
+    expect(panel.state).toBe(PanelState.Home);
+  });
 });
 
 describe('setPanelState', () => {
@@ -143,6 +163,41 @@ describe('setPanelState', () => {
 
     const client = new YaleApiClient('u', 'p');
     await expect(client.setPanelState(PanelState.Armed)).rejects.toThrow('Yale panel rejected state change');
+  });
+
+  it('includes both code and message from API in rejection error', async () => {
+    mockFetch
+      .mockResolvedValueOnce(makeResponse(AUTH_RESPONSE))
+      .mockResolvedValueOnce(makeResponse({ code: '403', message: 'Unauthorized' }));
+
+    const client = new YaleApiClient('u', 'p');
+    await expect(client.setPanelState(PanelState.Armed)).rejects.toThrow(
+      expect.objectContaining({ message: expect.stringMatching(/code=403.*Unauthorized|Unauthorized.*code=403/) })
+    );
+  });
+
+  it('throws a descriptive error including HTTP status on non-2xx response', async () => {
+    mockFetch
+      .mockResolvedValueOnce(makeResponse(AUTH_RESPONSE))
+      .mockResolvedValueOnce(makeResponse({ error: 'forbidden' }, 403));
+
+    const client = new YaleApiClient('u', 'p');
+    await expect(client.setPanelState(PanelState.Armed)).rejects.toThrow('HTTP 403');
+  });
+
+  it('throws if the API returns non-JSON', async () => {
+    const nonJsonResponse = {
+      ok: true,
+      status: 200,
+      text: () => Promise.resolve('not json'),
+      json: () => Promise.reject(new SyntaxError('bad json')),
+    } as unknown as Response;
+    mockFetch
+      .mockResolvedValueOnce(makeResponse(AUTH_RESPONSE))
+      .mockResolvedValueOnce(nonJsonResponse);
+
+    const client = new YaleApiClient('u', 'p');
+    await expect(client.setPanelState(PanelState.Armed)).rejects.toThrow('non-JSON');
   });
 
   it('does not send a duplicate Authorization header', async () => {
