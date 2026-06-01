@@ -75,7 +75,9 @@ export class YaleApiClient {
     const rawMode: string = entry.mode ?? entry.state ?? '';
     // Normalise: API sometimes returns 'arm_full'/'arm_partial' instead of 'arm'/'home'
     const normalisedMode = rawMode === 'arm_full' ? 'arm' : rawMode === 'arm_partial' ? 'home' : rawMode;
-    Logger.info(`getPanel raw mode: '${rawMode}' -> normalised: '${normalisedMode}'`);
+    if (normalisedMode !== rawMode) {
+      Logger.info(`getPanel: normalised raw mode '${rawMode}' -> '${normalisedMode}'`);
+    }
     return {
       identifier: '1',
       name: entry.name || 'Yale Panel',

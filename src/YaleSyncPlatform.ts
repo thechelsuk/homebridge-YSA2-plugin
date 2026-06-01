@@ -49,9 +49,19 @@ class YaleSyncPlatform implements DynamicPlatformPlugin {
 	private PlatformAccessory: any;
 
 	configureAccessory(accessory: HBPlatformAccessory): void {
-		// Required by Homebridge v2 platform interface
-		// Store or restore accessory as needed
-		this._accessories[accessory.UUID] = accessory;
+		// Called by Homebridge for every cached accessory on startup.
+		// Must wire up characteristic handlers — not just store the accessory —
+		// otherwise set/get callbacks are never registered and commands are silently ignored.
+		const kind = (accessory as any).context?.kind;
+		if (kind === 'panel') {
+			this.configurePanel(accessory);
+		} else if (kind === 'motionSensor') {
+			this.configureMotionSensor(accessory);
+		} else if (kind === 'contactSensor') {
+			this.configureContactSensor(accessory);
+		} else {
+			this._accessories[(accessory as any).UUID] = accessory;
+		}
 	}
 
 	async heartbeat(interval: number) {
