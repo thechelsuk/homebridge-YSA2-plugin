@@ -113,7 +113,7 @@ describe('setPanelState', () => {
   it('sends form-encoded body with correct mode string', async () => {
     mockFetch
       .mockResolvedValueOnce(makeResponse(AUTH_RESPONSE))
-      .mockResolvedValueOnce(makeResponse({ data: { cmd_ack: 'OK' } }));
+      .mockResolvedValueOnce(makeResponse({ code: '000', data: {} }));
 
     const client = new YaleApiClient('u', 'p');
     const result = await client.setPanelState(PanelState.Armed);
@@ -128,7 +128,7 @@ describe('setPanelState', () => {
   it('sends "disarm" for Disarmed state', async () => {
     mockFetch
       .mockResolvedValueOnce(makeResponse(AUTH_RESPONSE))
-      .mockResolvedValueOnce(makeResponse({ data: { cmd_ack: 'OK' } }));
+      .mockResolvedValueOnce(makeResponse({ code: '000', data: {} }));
 
     const client = new YaleApiClient('u', 'p');
     await client.setPanelState(PanelState.Disarmed);
@@ -139,7 +139,7 @@ describe('setPanelState', () => {
   it('throws if API rejects the state change', async () => {
     mockFetch
       .mockResolvedValueOnce(makeResponse(AUTH_RESPONSE))
-      .mockResolvedValueOnce(makeResponse({ data: { cmd_ack: 'FAIL' } }));
+      .mockResolvedValueOnce(makeResponse({ code: '999', data: {} }));
 
     const client = new YaleApiClient('u', 'p');
     await expect(client.setPanelState(PanelState.Armed)).rejects.toThrow('Yale panel rejected state change');
@@ -148,7 +148,7 @@ describe('setPanelState', () => {
   it('does not send a duplicate Authorization header', async () => {
     mockFetch
       .mockResolvedValueOnce(makeResponse(AUTH_RESPONSE))
-      .mockResolvedValueOnce(makeResponse({ data: { cmd_ack: 'OK' } }));
+      .mockResolvedValueOnce(makeResponse({ code: '000', data: {} }));
 
     const client = new YaleApiClient('u', 'p');
     await client.setPanelState(PanelState.Home);

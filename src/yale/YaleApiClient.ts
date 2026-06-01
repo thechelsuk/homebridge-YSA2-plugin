@@ -95,9 +95,9 @@ export class YaleApiClient {
       throw new Error('Failed to set panel state');
     }
     const data = await resp.json();
-    const ack = data.data?.cmd_ack;
-    if (ack !== 'OK') {
-      throw new Error(`Yale panel rejected state change: ${ack}`);
+    // Yale API returns { "code": "000", ... } for success
+    if (data.code !== '000') {
+      throw new Error(`Yale panel rejected state change: code=${data.code}`);
     }
     return {
       identifier: '1',

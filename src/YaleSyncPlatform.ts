@@ -266,10 +266,17 @@ class YaleSyncPlatform implements DynamicPlatformPlugin {
 						return;
 					}
 					if (context !== 'no_recurse') {
-						callback();
-						const mode = await this._yale.setPanelState(targetStateToMode(this.Characteristic, targetState));
-						this._log.info(`Panel mode: ${mode.state}, HomeKit state: ${currentStateToString(this.Characteristic, modeToCurrentState(this.Characteristic, mode.state))}`);
-						securitySystem.getCharacteristic(this.Characteristic.SecuritySystemCurrentState)?.updateValue(modeToCurrentState(this.Characteristic, mode.state));
+						try {
+							const mode = await this._yale.setPanelState(targetStateToMode(this.Characteristic, targetState));
+							this._log.info(`Panel mode: ${mode.state}, HomeKit state: ${currentStateToString(this.Characteristic, modeToCurrentState(this.Characteristic, mode.state))}`);
+							securitySystem.getCharacteristic(this.Characteristic.SecuritySystemCurrentState)?.updateValue(modeToCurrentState(this.Characteristic, mode.state));
+							callback(null);
+						} catch (err) {
+							this._log.error('Failed to set panel state:', err);
+							callback(err instanceof Error ? err : new Error(String(err)));
+						}
+					} else {
+						callback(null);
 					}
 				});
 			this._accessories[accessory.UUID] = accessory;
