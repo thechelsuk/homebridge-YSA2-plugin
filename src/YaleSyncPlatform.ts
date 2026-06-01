@@ -2,12 +2,12 @@ import { YaleApiClient } from './yale/YaleApiClient';
 import { platformConfigDecoder } from './YaleSyncPlatformConfig';
 import { Logger } from './yale/Logger';
 import { ContactSensor, MotionSensor, Panel, MotionSensorState, ContactSensorState } from './yale/YaleModels';
-import { modeToCurrentState, targetStateToString, targetStateToMode, currentStateToString } from './YaleSyncHelpers';
+import { modeToCurrentState, modeToTargetState, targetStateToString, targetStateToMode, currentStateToString } from './YaleSyncHelpers';
 import wait from './Wait';
 import { API, DynamicPlatformPlugin, Logger as HBLogger, PlatformConfig, PlatformAccessory as HBPlatformAccessory, CharacteristicValue, CharacteristicGetCallback, CharacteristicSetCallback } from 'homebridge';
 
 
-const pluginName = 'homebridge-yalesyncalarm';
+const pluginName = 'homebridge-ysa2';
 const platformName = 'YaleSyncAlarm';
 
 class YaleSyncPlatform implements DynamicPlatformPlugin {
@@ -50,8 +50,8 @@ class YaleSyncPlatform implements DynamicPlatformPlugin {
 
 	configureAccessory(accessory: HBPlatformAccessory): void {
 		// Called by Homebridge for every cached accessory on startup.
-		// Must wire up characteristic handlers — not just store the accessory —
-		// otherwise set/get callbacks are never registered and commands are silently ignored.
+		// Must call the configure methods first so handlers are registered before storing,
+		// because the configure methods guard on accessories[UUID] === undefined.
 		const kind = (accessory as any).context?.kind;
 		if (kind === 'panel') {
 			this.configurePanel(accessory);
@@ -59,7 +59,10 @@ class YaleSyncPlatform implements DynamicPlatformPlugin {
 			this.configureMotionSensor(accessory);
 		} else if (kind === 'contactSensor') {
 			this.configureContactSensor(accessory);
-		} else {
+		}
+		// Fallback: store the accessory even if _yale was not ready during configure,
+		// so Homebridge doesn't think it's been removed and unregister it.
+		if (!this._accessories[(accessory as any).UUID]) {
 			this._accessories[(accessory as any).UUID] = accessory;
 		}
 	}
@@ -125,7 +128,7 @@ class YaleSyncPlatform implements DynamicPlatformPlugin {
 					accessory
 						.getService(this.Service.SecuritySystem)
 						.getCharacteristic(this.Characteristic.SecuritySystemCurrentState)
-						?.setValue(modeToCurrentState(this.Characteristic, panel.state), undefined, 'no_recurse');
+						?.updateValue(modeToCurrentState(this.Characteristic, panel.state));
 				}
 			} else if (accessory.context.kind === 'motionSensor') {
 				const motionSensor = motionSensors[accessory.context.identifier];
@@ -133,11 +136,7 @@ class YaleSyncPlatform implements DynamicPlatformPlugin {
 					accessory
 						.getService(this.Service.MotionSensor)
 						.getCharacteristic(this.Characteristic.MotionDetected)
-						?.setValue(
-							motionSensor.state === MotionSensorState.Triggered ? true : false,
-							undefined,
-							'no_recurse'
-						);
+						?.updateValue(motionSensor.state === MotionSensorState.Triggered);
 				}
 			} else if (accessory.context.kind === 'contactSensor') {
 				const contactSensor = contactSensors[accessory.context.identifier];
@@ -145,11 +144,7 @@ class YaleSyncPlatform implements DynamicPlatformPlugin {
 					accessory
 						.getService(this.Service.ContactSensor)
 						.getCharacteristic(this.Characteristic.ContactSensorState)
-						?.setValue(
-							contactSensor.state === ContactSensorState.Closed ? 0 : 1,
-							undefined,
-							'no_recurse'
-						);
+						?.updateValue(contactSensor.state === ContactSensorState.Closed ? 0 : 1);
 				}
 			}
 		}
@@ -268,7 +263,7 @@ class YaleSyncPlatform implements DynamicPlatformPlugin {
 						return;
 					}
 					let panel = await this._yale.getPanel();
-					callback(null, modeToCurrentState(this.Characteristic, panel.state));
+					callback(null, modeToTargetState(this.Characteristic, panel.state));
 				})
 				.on('set' as any, async (targetState: CharacteristicValue, callback: CharacteristicSetCallback, context?: any) => {
 					if (this._yale === undefined) {

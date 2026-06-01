@@ -10,7 +10,6 @@ export class YaleApiClient {
   private username: string;
   private password: string;
   private accessToken: AccessToken | null = null;
-  private panelIdentifier: string | null = null;
   // private lock = new Lock(); // Uncomment if concurrency is needed
 
   constructor(username: string, password: string) {
@@ -22,12 +21,12 @@ export class YaleApiClient {
     if (!this.accessToken || new Date() > this.accessToken.expiration) {
       await this.authenticate();
     }
-    options.headers = {
+    const headers = {
       'Authorization': `Bearer ${this.accessToken!.token}`,
       'Accept': 'application/json, application/xml, text/plain, text/html, *.*',
       ...(options.headers || {}),
     };
-    return fetch(url, options);
+    return fetch(url, { ...options, headers });
   }
 
   private async authenticate(): Promise<void> {
@@ -55,11 +54,6 @@ export class YaleApiClient {
       expiration: new Date(Date.now() + (data.expires_in || 3600) * 1000),
     };
     Logger.info('Authenticated with Yale API');
-  }
-
-  private async getPanelIdentifier(): Promise<string> {
-    // Old plugin does not use panel identifier, so just return a dummy value
-    return '1';
   }
 
   async getPanel(): Promise<Panel> {

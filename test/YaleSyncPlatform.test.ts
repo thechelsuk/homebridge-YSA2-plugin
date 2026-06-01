@@ -120,6 +120,65 @@ describe('YaleSyncPlatform', () => {
     log = makeLog();
   });
 
+  // Helper: build a panel accessory with real mock services
+  function makePanelAccessory(uuid = 'uuid-panel-ca') {
+    const accessory = makePlatformAccessory('Yale Panel', uuid);
+    accessory.context = { kind: 'panel', identifier: '1' };
+    const infoService = makeService('AccessoryInformation');
+    const secService = makeService('SecuritySystem');
+    accessory.getService = jest.fn((key: string) => {
+      if (key === Service.AccessoryInformation) return infoService;
+      if (key === Service.SecuritySystem) return secService;
+      return undefined;
+    }) as any;
+    accessory.addService = jest.fn((key: string) => {
+      if (key === Service.SecuritySystem) return secService;
+      return makeService(key);
+    }) as any;
+    return { accessory, secService };
+  }
+
+  describe('configureAccessory (Homebridge cached-accessory startup path)', () => {
+    it('registers a set handler on the panel so HomeKit commands reach the API', async () => {
+      // This is the critical regression test: configureAccessory must fully wire up
+      // handlers, not just store the accessory. If the order is wrong (store before
+      // configure), the guard inside configurePanel short-circuits and no handlers
+      // are ever attached — commands from HomeKit are silently dropped.
+      mockYale.setPanelState = jest.fn().mockResolvedValue({
+        identifier: '1', name: 'Yale Panel', state: PanelState.Armed,
+      });
+      const platform = new YaleSyncPlatform(log, config, api);
+      const { accessory, secService } = makePanelAccessory();
+
+      platform.configureAccessory(accessory);
+
+      // Find the 'set' handler registered on any characteristic
+      let setHandler: Function | undefined;
+      for (const char of Object.values(secService._characteristics)) {
+        const call = (char as any).on.mock.calls.find((c: any[]) => c[0] === 'set');
+        if (call) { setHandler = call[1]; break; }
+      }
+
+      expect(setHandler).toBeDefined(); // fails if handlers were never registered
+      const callback = jest.fn();
+      await setHandler!(Characteristic.SecuritySystemTargetState.AWAY_ARM, callback, undefined);
+      expect(mockYale.setPanelState).toHaveBeenCalledWith(PanelState.Armed);
+      expect(callback).toHaveBeenCalledWith(null);
+    });
+
+    it('stores the accessory even if _yale is not initialised', () => {
+      // Config is invalid so _yale will be undefined
+      const badConfig = { platform: 'YaleSyncAlarm', name: 'Yale' }; // missing username/password
+      const platform = new YaleSyncPlatform(log, badConfig as any, api);
+      const { accessory } = makePanelAccessory('uuid-fallback');
+
+      platform.configureAccessory(accessory);
+
+      // Accessory should still be stored so Homebridge doesn't evict it
+      expect((platform as any)._accessories['uuid-fallback']).toBe(accessory);
+    });
+  });
+
   describe('configurePanel', () => {
     it('adds SecuritySystem service and stores accessory', () => {
       const platform = new YaleSyncPlatform(log, config, api);

@@ -14,7 +14,20 @@ export function modeToCurrentState(Characteristic: any, mode: PanelState) {
     default:
       return Characteristic.SecuritySystemCurrentState.DISARMED;
   }
+}
+
+export function modeToTargetState(Characteristic: any, mode: PanelState) {
+  switch (mode) {
+    case PanelState.Armed:
+      return Characteristic.SecuritySystemTargetState.AWAY_ARM;
+    case PanelState.Disarmed:
+      return Characteristic.SecuritySystemTargetState.DISARM;
+    case PanelState.Home:
+      return Characteristic.SecuritySystemTargetState.NIGHT_ARM;
+    default:
+      return Characteristic.SecuritySystemTargetState.DISARM;
   }
+}
 
 export function targetStateToString(Characteristic: any, state: CharacteristicValue) {
   if (state === Characteristic.SecuritySystemTargetState.STAY_ARM) {
