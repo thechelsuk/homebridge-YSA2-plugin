@@ -3,3 +3,4 @@ dist/
 .vscode
 .venv
 test-yale-client.ts
+.DS_Store
