@@ -26,13 +26,17 @@ jobs:
       - run: npm install
       - run: npm run build
 
-      - id: get_version
+      - name: Get Version, Description, and Commit Message
+        id: get_data
         run: |
           echo "version=v$(node -p 'require("./package.json").version')" >> $GITHUB_OUTPUT
+          echo 'description<<EOF\n%s\nEOF\n' "$(node -p 'require("./package.json").description')" >> $GITHUB_OUTPUT
+          echo 'message<<EOF\n%s\nEOF\n' "$(git log -1 --pretty=%B)" >> $GITHUB_OUTPUT'
 
-      - id: check_tag
+      - name: Check if Tag Exists
+        id: check_tag
         run: |
-          if git rev-parse ${{ steps.get_version.outputs.version }} >/dev/null 2>&1; then
+          if git rev-parse ${{ steps.get_data.outputs.version }} >/dev/null 2>&1; then
             echo "Tag exists"
             echo "tag_exists=true" >> $GITHUB_OUTPUT
           else
@@ -45,30 +49,30 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "actions@.github.com"
-          git tag ${{ steps.get_version.outputs.version }}
-          git push origin ${{ steps.get_version.outputs.version }}
+          git tag ${{ steps.get_data.outputs.version }}
+          git push origin ${{ steps.get_data.outputs.version }}
 
       - name: Create GitHub Release
-        if: |
-          steps.version_changed.outputs.changed == 'true' &&
-          steps.tag_check.outputs.exists == 'false'
-          uses: softprops/action-gh-release@v3
-          with:
-            tag_name: ${{ steps.get_version.outputs.version }}
-            name: ${{ steps.get_version.outputs.version }}
-            make_latest: true
-            body: |
-              ## About
+        id: create_release
+        if: steps.check_tag.outputs.tag_exists == 'false'
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: ${{ steps.get_data.outputs.version }}
+          name: ${{ steps.get_data.outputs.version }}
+          make_latest: true
+          body: |
+            ## About
 
-              ${{ steps.pkg.outputs.description }}
+            ${{ steps.get_data.outputs.description }}
 
-              ## Recent Changes
+            ## Recent Changes
 
-              ${{ steps.commit.outputs.message }}
-            draft: false
-            prerelease: ${{ contains(steps.get_version.outputs.version, '-') }}
+            ${{ steps.get_data.outputs.message }}
+          draft: false
+          prerelease: ${{ contains(steps.get_data.outputs.version, '-') }}
 
       - name: Publish to NPM
+        needs: create_release
         run: npm publish --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
