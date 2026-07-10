@@ -40,7 +40,7 @@ jobs:
 
           {
             echo "message<<EOF"
-            git log -1 --pretty=%B
+            git log -1 --pretty=%B | grep -v '^Signed-off-by:' || true
             echo "EOF"
           } >> "$GITHUB_OUTPUT"
 
