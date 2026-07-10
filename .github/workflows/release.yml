@@ -1,4 +1,4 @@
-name: Release and Publish to NPM
+name: CICD Pipeline
 
 permissions:
   contents: write
