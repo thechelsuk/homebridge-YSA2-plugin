@@ -1,4 +1,4 @@
-name: Release and Publish to npm
+name: Release and Publish to NPM
 
 permissions:
   contents: write
@@ -7,6 +7,8 @@ on:
   push:
     branches:
       - main
+    paths:
+      - 'package.json'
 
 jobs:
   tag-and-publish:
@@ -14,7 +16,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
-          fetch-depth: 0 # fetch all history and tags
+          fetch-depth: 0
 
       - uses: actions/setup-node@v6
         with:
@@ -24,12 +26,10 @@ jobs:
       - run: npm install
       - run: npm run build
 
-      # Get version from package.json
       - id: get_version
         run: |
           echo "version=v$(node -p 'require("./package.json").version')" >> $GITHUB_OUTPUT
 
-      # Check if tag exists
       - id: check_tag
         run: |
           if git rev-parse ${{ steps.get_version.outputs.version }} >/dev/null 2>&1; then
@@ -40,8 +40,7 @@ jobs:
             echo "tag_exists=false" >> $GITHUB_OUTPUT
           fi
 
-      # Create and push tag if it doesn't exist
-      - name: Create and push tag
+      - name: Create and Push Tag
         if: steps.check_tag.outputs.tag_exists == 'false'
         run: |
           git config user.name "github-actions[bot]"
@@ -49,7 +48,28 @@ jobs:
           git tag ${{ steps.get_version.outputs.version }}
           git push origin ${{ steps.get_version.outputs.version }}
 
-      # Publish to npm
-      - run: npm publish --access public
+      - name: Create GitHub Release
+        if: |
+          steps.version_changed.outputs.changed == 'true' &&
+          steps.tag_check.outputs.exists == 'false'
+          uses: softprops/action-gh-release@v3
+          with:
+            tag_name: ${{ steps.get_version.outputs.version }}
+            name: ${{ steps.get_version.outputs.version }}
+            make_latest: true
+            body: |
+              ## About
+
+              ${{ steps.pkg.outputs.description }}
+
+              ## Recent Changes
+
+              ${{ steps.commit.outputs.message }}
+            draft: false
+            prerelease: ${{ contains(steps.get_version.outputs.version, '-') }}
+
+      - name: Publish to NPM
+        needs: Create GitHub Release
+        run: npm publish --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

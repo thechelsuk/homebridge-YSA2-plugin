@@ -6,7 +6,6 @@ Homebridge plugin for the [Yale Sync Smart Home Alarm](https://www.yale.co.uk/en
 
 This plugin pairs very nicely with the Dummy homebridge switch. Apple does not allow alarms to be set via automation directly, however, using a dummy switch enables this to happy with one hop. Automation (e.g. last person leaves home) sets the dummy to on, another automation sets the alarm to 'away/armed' when dummy is on, and vice versa for when first person arrives home.
 
-
 ## Features
 
 - Exposes the alarm system as a Home.app security system. You can set it to "Home", "Away", "Night" and "Off" modes. Yale alarms only have 3 modes. So both "Home" and "Night" will "part-arm" the system. Based on your Yale app config, this might be to arm downstairs whilst you sleep upstairs.
@@ -41,7 +40,7 @@ git clone https://github.com/thechelsuk/homebridge-ysa2-plugin.git
 && npm install
 ```
 
-## Notes
+## Notes
 
 After running `npm install`, `npm` should automatically run `npm run build`, which runs `node_modules/typescript/bin/tsc` to compile the typescript files. If it doesn't then you can run either `node_modules/typescript/bin/tsc` or `npm run build`.
 
