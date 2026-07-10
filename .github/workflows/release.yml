@@ -69,7 +69,6 @@ jobs:
             prerelease: ${{ contains(steps.get_version.outputs.version, '-') }}
 
       - name: Publish to NPM
-        needs: Create GitHub Release
         run: npm publish --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
