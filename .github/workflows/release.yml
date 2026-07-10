@@ -80,7 +80,6 @@ jobs:
     needs: Release
     steps:
       - name: Publish to NPM
-        needs: create_release
         run: npm publish --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
