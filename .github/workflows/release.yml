@@ -2,6 +2,7 @@ name: CICD Pipeline
 
 permissions:
   contents: write
+  id-token: write # npm trusted publishing (OIDC)
 
 on:
   push:
@@ -23,6 +24,9 @@ jobs:
         with:
           node-version: '24'
           registry-url: 'https://registry.npmjs.org/'
+
+      # Trusted publishing needs npm >= 11.5.1
+      - run: npm install -g npm@latest
 
       - run: npm ci
       - run: npm run build
@@ -85,8 +89,17 @@ jobs:
           draft: false
           prerelease: ${{ contains(steps.get_data.outputs.version, '-') }}
 
+      # Keyed on the registry, not the git tag, so a failed publish can be retried
+      # via "Run workflow" without bumping the version.
+      - name: Check if version is on npm
+        id: check_npm
+        run: |
+          if npm view "homebridge-ysa2@$(node -p 'require("./package.json").version')" version >/dev/null 2>&1; then
+            echo "published=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "published=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Publish to NPM
-        if: steps.check_tag.outputs.tag_exists == 'false'
+        if: steps.check_npm.outputs.published == 'false'
         run: npm publish --access public --ignore-scripts
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
