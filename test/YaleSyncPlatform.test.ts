@@ -4,7 +4,11 @@ import { PanelState, ContactSensorState, MotionSensorState } from '../src/yale/Y
 
 function makeCharacteristic() {
   const characteristic: any = {
-    on: jest.fn((_event: string, _handler: Function) => characteristic),
+    onGet: jest.fn((handler: Function) => { characteristic._get = handler; return characteristic; }),
+    onSet: jest.fn((handler: Function) => { characteristic._set = handler; return characteristic; }),
+    setProps: jest.fn(),
+    _get: undefined as Function | undefined,
+    _set: undefined as Function | undefined,
     setValue: jest.fn(),
     getValue: jest.fn(),
     updateValue: jest.fn(),
@@ -47,11 +51,16 @@ const Characteristic = {
   Manufacturer: 'Manufacturer',
   Model: 'Model',
   SerialNumber: 'SerialNumber',
-  SecuritySystemCurrentState: { AWAY_ARM: 1, DISARMED: 3, NIGHT_ARM: 2, STAY_ARM: 0 },
-  SecuritySystemTargetState: { STAY_ARM: 0, AWAY_ARM: 1, DISARM: 3 },
+  SecuritySystemCurrentState: { AWAY_ARM: 1, DISARMED: 3, NIGHT_ARM: 2, STAY_ARM: 0, ALARM_TRIGGERED: 4 },
+  SecuritySystemTargetState: { STAY_ARM: 0, AWAY_ARM: 1, NIGHT_ARM: 2, DISARM: 3 },
   MotionDetected: 'MotionDetected',
   ContactSensorState: 'ContactSensorState',
 };
+
+// Give the enum-like characteristics distinct string keys (the mock service keys by String(key)).
+for (const name of ['SecuritySystemCurrentState', 'SecuritySystemTargetState'] as const) {
+  Object.defineProperty((Characteristic as any)[name], 'toString', { value: () => name, enumerable: false });
+}
 
 const Service = {
   AccessoryInformation: 'AccessoryInformation',
@@ -152,18 +161,11 @@ describe('YaleSyncPlatform', () => {
 
       platform.configureAccessory(accessory);
 
-      // Find the 'set' handler registered on any characteristic
-      let setHandler: Function | undefined;
-      for (const char of Object.values(secService._characteristics)) {
-        const call = (char as any).on.mock.calls.find((c: any[]) => c[0] === 'set');
-        if (call) { setHandler = call[1]; break; }
-      }
+      const setHandler = secService.getCharacteristic(Characteristic.SecuritySystemTargetState as any)?._set;
 
       expect(setHandler).toBeDefined(); // fails if handlers were never registered
-      const callback = jest.fn();
-      await setHandler!(Characteristic.SecuritySystemTargetState.AWAY_ARM, callback, undefined);
+      await setHandler!(Characteristic.SecuritySystemTargetState.AWAY_ARM);
       expect(mockYale.setPanelState).toHaveBeenCalledWith(PanelState.Armed);
-      expect(callback).toHaveBeenCalledWith(null);
     });
 
     it('stores the accessory even if _yale is not initialised', () => {
@@ -253,12 +255,7 @@ describe('YaleSyncPlatform', () => {
       api.registerPlatformAccessories = registerMock;
       const platform = new YaleSyncPlatform(log, config, api);
 
-      // Run just one iteration by making getPanel throw on second call
-      mockYale.getPanel
-        .mockResolvedValueOnce(PANEL)
-        .mockRejectedValue(new Error('stop'));
-
-      await platform.heartbeat(0).catch(() => {});
+      await platform.poll();
 
       expect(registerMock).toHaveBeenCalledTimes(1);
       const registered: any[] = registerMock.mock.calls[0][2];
@@ -273,16 +270,8 @@ describe('YaleSyncPlatform', () => {
       api.registerPlatformAccessories = registerMock;
       const platform = new YaleSyncPlatform(log, config, api);
 
-      mockYale.getPanel
-        .mockResolvedValueOnce(PANEL)
-        .mockResolvedValueOnce(PANEL)
-        .mockRejectedValue(new Error('stop'));
-      mockYale.getSensors
-        .mockResolvedValueOnce([MOTION_SENSOR, CONTACT_SENSOR])
-        .mockResolvedValueOnce([MOTION_SENSOR, CONTACT_SENSOR])
-        .mockRejectedValue(new Error('stop'));
-
-      await platform.heartbeat(0).catch(() => {});
+      await platform.poll();
+      await platform.poll();
 
       // First iteration registers 3; second iteration should register 0
       expect(registerMock).toHaveBeenCalledTimes(1);
@@ -291,13 +280,17 @@ describe('YaleSyncPlatform', () => {
     it('logs error and continues looping on API failure', async () => {
       const platform = new YaleSyncPlatform(log, config, api);
 
-      mockYale.getPanel
-        .mockRejectedValueOnce(new Error('network error'))
-        .mockResolvedValueOnce(PANEL)
-        .mockRejectedValue(new Error('stop'));
-      mockYale.getSensors.mockResolvedValue([]).mockRejectedValue(new Error('stop'));
+      let calls = 0;
+      mockYale.getPanel.mockImplementation(async () => {
+        if (++calls === 1) throw new Error('network error');
+        (platform as any)._stopped = true; // second pass succeeds, then end the loop
+        return PANEL;
+      });
+      mockYale.getSensors.mockResolvedValue([]);
 
-      await platform.heartbeat(0).catch(() => {});
+      await platform.heartbeat(0);
+
+      expect(calls).toBe(2);
 
       expect(log.error).toHaveBeenCalledWith(
         expect.stringContaining('Heartbeat error'),
@@ -307,8 +300,8 @@ describe('YaleSyncPlatform', () => {
   });
 
   // ---- Helper: configure a real panel accessory and extract the 'set' handler ----
-  function setupPanelSetHandler() {
-    const platform = new YaleSyncPlatform(log, config, api);
+  function setupPanelSetHandler(cfg: any = config) {
+    const platform = new YaleSyncPlatform(log, cfg, api);
     const accessory = makePlatformAccessory('Yale Panel', 'uuid-panel-set');
     accessory.context = { kind: 'panel', identifier: '1' };
 
@@ -323,24 +316,11 @@ describe('YaleSyncPlatform', () => {
 
     platform.configurePanel(accessory);
 
-    // Retrieve the 'set' handler from whichever characteristic had it registered.
-    // The platform passes Characteristic objects as keys; they stringify to '[object Object]',
-    // so we search all registered characteristics for the one with a 'set' call.
-    let setHandler: Function | undefined;
-    let currentStateCharacteristic: ReturnType<typeof makeCharacteristic> | undefined;
-    for (const char of Object.values(secService._characteristics)) {
-      const onMock = (char as any).on as jest.Mock;
-      const setCall = onMock.mock.calls.find((c: any[]) => c[0] === 'set');
-      if (setCall) {
-        setHandler = setCall[1];
-        currentStateCharacteristic = char as any;
-        break;
-      }
-    }
-    if (!setHandler || !currentStateCharacteristic) {
-      throw new Error('Could not find set handler on SecuritySystem characteristic');
-    }
-    return { platform, setHandler, currentStateCharacteristic };
+    const setHandler = secService.getCharacteristic(Characteristic.SecuritySystemTargetState as any)._set as Function;
+    const currentStateCharacteristic = secService.getCharacteristic(Characteristic.SecuritySystemCurrentState as any);
+    const targetGet = secService.getCharacteristic(Characteristic.SecuritySystemTargetState as any)._get as Function;
+    const currentGet = currentStateCharacteristic._get as Function;
+    return { platform, setHandler, currentStateCharacteristic, targetGet, currentGet, secService };
   }
 
   describe('panel set handler', () => {
@@ -348,52 +328,106 @@ describe('YaleSyncPlatform', () => {
       mockYale.setPanelState = jest.fn().mockResolvedValue({ identifier: '1', name: 'Yale Panel', state: PanelState.Armed });
       const { setHandler, currentStateCharacteristic } = setupPanelSetHandler();
 
-      const callback = jest.fn();
-      // AWAY_ARM = 1
-      await setHandler(Characteristic.SecuritySystemTargetState.AWAY_ARM, callback, undefined);
+      await setHandler(Characteristic.SecuritySystemTargetState.AWAY_ARM);
 
       expect(mockYale.setPanelState).toHaveBeenCalledWith(PanelState.Armed);
-      expect(callback).toHaveBeenCalledWith(null);
       expect(currentStateCharacteristic.updateValue).toHaveBeenCalledWith(
         Characteristic.SecuritySystemCurrentState.AWAY_ARM
       );
     });
 
-    it('calls callback with error and logs when setPanelState rejects', async () => {
+    it('rejects and logs when setPanelState rejects', async () => {
       const apiError = new Error('API failure');
       mockYale.setPanelState = jest.fn().mockRejectedValue(apiError);
       const { setHandler } = setupPanelSetHandler();
 
-      const callback = jest.fn();
-      await setHandler(Characteristic.SecuritySystemTargetState.AWAY_ARM, callback, undefined);
-
-      expect(callback).toHaveBeenCalledWith(apiError);
-      expect(log.error).toHaveBeenCalledWith(
-        expect.stringContaining('Set alarm failed'),
-        apiError,
-      );
-    });
-
-    it('does nothing and calls callback(null) when context is no_recurse', async () => {
-      mockYale.setPanelState = jest.fn();
-      const { setHandler } = setupPanelSetHandler();
-
-      const callback = jest.fn();
-      await setHandler(Characteristic.SecuritySystemTargetState.AWAY_ARM, callback, 'no_recurse');
-
-      expect(mockYale.setPanelState).not.toHaveBeenCalled();
-      expect(callback).toHaveBeenCalledWith(null);
+      await expect(setHandler(Characteristic.SecuritySystemTargetState.AWAY_ARM)).rejects.toBe(apiError);
+      expect(log.error).toHaveBeenCalledWith(expect.stringContaining('Set alarm failed'), apiError);
     });
 
     it('logs the requested HomeKit target state and Yale mode before calling API', async () => {
       mockYale.setPanelState = jest.fn().mockResolvedValue({ identifier: '1', name: 'Yale Panel', state: PanelState.Armed });
       const { setHandler } = setupPanelSetHandler();
 
-      await setHandler(Characteristic.SecuritySystemTargetState.AWAY_ARM, jest.fn(), undefined);
+      await setHandler(Characteristic.SecuritySystemTargetState.AWAY_ARM);
 
       expect(log.info).toHaveBeenCalledWith(
         expect.stringMatching(/Set alarm requested.*away.*arm/i)
       );
+    });
+
+    it('part-arms (home) for both Stay and Night, never disarms', async () => {
+      mockYale.setPanelState = jest.fn().mockResolvedValue({ identifier: '1', name: 'Yale Panel', state: PanelState.Home });
+      const { setHandler } = setupPanelSetHandler();
+
+      await setHandler(Characteristic.SecuritySystemTargetState.NIGHT_ARM);
+      await setHandler(Characteristic.SecuritySystemTargetState.STAY_ARM);
+
+      expect(mockYale.setPanelState).toHaveBeenNthCalledWith(1, PanelState.Home);
+      expect(mockYale.setPanelState).toHaveBeenNthCalledWith(2, PanelState.Home);
+    });
+
+    it('shows part-arm as Stay by default and hides Night', async () => {
+      mockYale.getPanel = jest.fn().mockResolvedValue({ ...PANEL, state: PanelState.Home });
+      const { currentGet, targetGet, secService } = setupPanelSetHandler();
+
+      expect(await currentGet()).toBe(Characteristic.SecuritySystemCurrentState.STAY_ARM);
+      expect(await targetGet()).toBe(Characteristic.SecuritySystemTargetState.STAY_ARM);
+      const targetProps = secService.getCharacteristic(Characteristic.SecuritySystemTargetState as any).setProps.mock.calls[0][0];
+      expect(targetProps.validValues).not.toContain(Characteristic.SecuritySystemTargetState.NIGHT_ARM);
+    });
+
+    it('shows part-arm as Night and hides Stay when partialArmMode is night', async () => {
+      mockYale.getPanel = jest.fn().mockResolvedValue({ ...PANEL, state: PanelState.Home });
+      const { currentGet, targetGet, secService } = setupPanelSetHandler({ ...config, partialArmMode: 'night' });
+
+      expect(await currentGet()).toBe(Characteristic.SecuritySystemCurrentState.NIGHT_ARM);
+      expect(await targetGet()).toBe(Characteristic.SecuritySystemTargetState.NIGHT_ARM);
+      const targetProps = secService.getCharacteristic(Characteristic.SecuritySystemTargetState as any).setProps.mock.calls[0][0];
+      expect(targetProps.validValues).not.toContain(Characteristic.SecuritySystemTargetState.STAY_ARM);
+    });
+  });
+
+  describe('HomeKit reads', () => {
+    it('reject (rather than hang) when the Yale API fails', async () => {
+      mockYale.getPanel = jest.fn().mockRejectedValue(new Error('boom'));
+      const { currentGet } = setupPanelSetHandler();
+
+      await expect(currentGet()).rejects.toThrow('boom');
+      expect(log.error).toHaveBeenCalled();
+    });
+
+    it('are served from one shared fetch instead of one request per read', async () => {
+      const { currentGet, targetGet } = setupPanelSetHandler();
+
+      await Promise.all([currentGet(), targetGet(), currentGet()]);
+      await currentGet();
+
+      expect(mockYale.getPanel).toHaveBeenCalledTimes(1);
+      expect(mockYale.getSensors).toHaveBeenCalledTimes(1);
+    });
+
+    it('a poll refreshes the cache and pushes target state too', async () => {
+      const platform = new YaleSyncPlatform(log, config, api);
+      const { accessory, secService } = makePanelAccessory('uuid-1');
+      platform.configureAccessory(accessory);
+      mockYale.getPanel.mockResolvedValue({ ...PANEL, state: PanelState.Disarmed });
+
+      await platform.poll();
+
+      const target = secService.getCharacteristic(Characteristic.SecuritySystemTargetState as any);
+      expect(target.updateValue).toHaveBeenCalledWith(Characteristic.SecuritySystemTargetState.DISARM);
+    });
+
+    it('fetch panel and sensors in parallel', async () => {
+      const platform = new YaleSyncPlatform(log, config, api);
+      let panelStarted = false;
+      mockYale.getPanel.mockImplementation(async () => { panelStarted = true; return PANEL; });
+      mockYale.getSensors.mockImplementation(async () => {
+        expect(panelStarted).toBe(true); // started before getPanel resolved a tick later
+        return [];
+      });
+      await platform.poll();
     });
   });
 });
