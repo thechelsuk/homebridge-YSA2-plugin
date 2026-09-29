@@ -25,7 +25,7 @@ jobs:
           node-version: '24'
           registry-url: 'https://registry.npmjs.org/'
 
-      # Trusted publishing needs npm >= 11.5.1
+      # Trusted publishing needs npm >= 11.5.1; staged publishing needs >= 11.15.0
       - run: npm install -g npm@latest
 
       - run: npm ci
@@ -100,6 +100,8 @@ jobs:
             echo "published=false" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Publish to NPM
+      # Staged publishing: CI uploads the release but it is not public until a maintainer
+      # approves it with 2FA (npm stage approve, or the npmjs.com staged-versions page).
+      - name: Stage release on NPM
         if: steps.check_npm.outputs.published == 'false'
-        run: npm publish --access public --ignore-scripts
+        run: npm stage publish --access public --ignore-scripts
