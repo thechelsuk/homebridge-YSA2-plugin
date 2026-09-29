@@ -295,3 +295,46 @@ describe('getSensors', () => {
     expect(sensors).toHaveLength(4);
   });
 });
+
+describe('auth handling', () => {
+  it('shares one login between concurrent requests', async () => {
+    mockFetch.mockImplementation(async (url: string) =>
+      url.includes('/o/token/')
+        ? makeResponse(AUTH_RESPONSE)
+        : makeResponse({ data: [{ mode: 'disarm', name: 'Panel' }] }));
+
+    const client = new YaleApiClient('u', 'p');
+    await Promise.all([client.getPanel(), client.getPanel(), client.getPanel()]);
+
+    const logins = mockFetch.mock.calls.filter(c => c[0].includes('/o/token/'));
+    expect(logins).toHaveLength(1);
+  });
+
+  it('re-authenticates and retries once on a 401', async () => {
+    mockFetch
+      .mockResolvedValueOnce(makeResponse(AUTH_RESPONSE))                 // login
+      .mockResolvedValueOnce(makeResponse({}, 401))                       // revoked token
+      .mockResolvedValueOnce(makeResponse({ access_token: 'new', expires_in: 3600 })) // login again
+      .mockResolvedValueOnce(makeResponse({ data: [{ mode: 'arm', name: 'Panel' }] }));
+
+    const client = new YaleApiClient('u', 'p');
+    const panel = await client.getPanel();
+
+    expect(panel.state).toBe(PanelState.Armed);
+    expect(mockFetch.mock.calls[3][1].headers['Authorization']).toBe('Bearer new');
+  });
+
+  it('refreshes a token that is about to expire', async () => {
+    mockFetch
+      .mockResolvedValueOnce(makeResponse({ access_token: 'short', expires_in: 30 }))
+      .mockResolvedValueOnce(makeResponse({ data: [{ mode: 'arm' }] }))
+      .mockResolvedValueOnce(makeResponse({ access_token: 'fresh', expires_in: 3600 }))
+      .mockResolvedValueOnce(makeResponse({ data: [{ mode: 'arm' }] }));
+
+    const client = new YaleApiClient('u', 'p');
+    await client.getPanel();
+    await client.getPanel();
+
+    expect(mockFetch.mock.calls[3][1].headers['Authorization']).toBe('Bearer fresh');
+  });
+});

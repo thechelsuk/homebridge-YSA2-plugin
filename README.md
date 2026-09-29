@@ -8,7 +8,7 @@ This plugin pairs very nicely with the Dummy homebridge switch. Apple does not a
 
 ## Features
 
-- Exposes the alarm system as a Home.app security system. You can set it to "Home", "Away", "Night" and "Off" modes. Yale alarms only have 3 modes. So both "Home" and "Night" will "part-arm" the system. Based on your Yale app config, this might be to arm downstairs whilst you sleep upstairs.
+- Exposes the alarm system as a Home.app security system. You can set it to "Home", "Away", "Night" and "Off" modes. Yale alarms only have 3 modes (Away, Home, Off), so "Home" and "Night" both send the same part-arm command. Which sensors that arms is set in the Yale app (e.g. downstairs only, so a trip to the bathroom at night doesn't set it off). The Yale API can't tell the two apart, so the plugin shows only one of them in Home.app: see `partialArmMode` below.
 - Contact and motion sensors are exposed in Home.app (these only work/trigger during an alarm going off due to the Yale API).
 - Updated with Homebridge 2.0.0 in mind.
 
@@ -27,10 +27,14 @@ Add in your username and password. In Yale you can create a secondary user.
         "name": "Burglar Alarm",
         "username": "username@mail.com",
         "password": "password",
-        "refreshInterval": 10
+        "refreshInterval": 10,
+        "partialArmMode": "stay"
     }
 ]
 ```
+
+- `refreshInterval`: seconds between polls of the Yale API (minimum 1).
+- `partialArmMode`: `"stay"` (default) or `"night"`. Chooses whether Yale's part-arm mode appears as Home or Night in Home.app; the other is hidden. Set to `"night"` if you use it for sleeping.
 
 ## Building from Source
 

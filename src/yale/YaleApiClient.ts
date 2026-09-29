@@ -1,7 +1,8 @@
 import { Panel, PanelState, AccessToken, ContactSensor, ContactSensorState, MotionSensor, MotionSensorState, Sensor } from './YaleModels';
 import { Logger } from './Logger';
-// import { Lock } from './Lock'; // Uncomment if concurrency is needed
 
+// Refresh the token slightly early so it can't expire mid-request.
+const TOKEN_EXPIRY_MARGIN_MS = 60 * 1000;
 const BASE_URL = 'https://mob.yalehomesystem.co.uk/yapi/';
 // Static Yale auth token from the old plugin (matches legacy working code)
 const YALE_AUTH_TOKEN = 'VnVWWDZYVjlXSUNzVHJhcUVpdVNCUHBwZ3ZPakxUeXNsRU1LUHBjdTpkd3RPbE15WEtENUJ5ZW1GWHV0am55eGhrc0U3V0ZFY2p0dFcyOXRaSWNuWHlSWHFsWVBEZ1BSZE1xczF4R3VwVTlxa1o4UE5ubGlQanY5Z2hBZFFtMHpsM0h4V3dlS0ZBcGZzakpMcW1GMm1HR1lXRlpad01MRkw3MGR0bmNndQ==';
@@ -10,7 +11,7 @@ export class YaleApiClient {
   private username: string;
   private password: string;
   private accessToken: AccessToken | null = null;
-  // private lock = new Lock(); // Uncomment if concurrency is needed
+  private authPromise: Promise<void> | null = null;
 
   constructor(username: string, password: string) {
     this.username = username;
@@ -18,15 +19,35 @@ export class YaleApiClient {
   }
 
   private async fetchWithAuth(url: string, options: RequestInit = {}): Promise<Response> {
-    if (!this.accessToken || new Date() > this.accessToken.expiration) {
-      await this.authenticate();
-    }
-    const headers = {
-      'Authorization': `Bearer ${this.accessToken!.token}`,
-      'Accept': 'application/json, application/xml, text/plain, text/html, *.*',
-      ...(options.headers || {}),
+    const send = async (): Promise<Response> => {
+      await this.ensureAuthenticated();
+      const headers = {
+        'Authorization': `Bearer ${this.accessToken!.token}`,
+        'Accept': 'application/json, application/xml, text/plain, text/html, *.*',
+        ...(options.headers || {}),
+      };
+      return fetch(url, { ...options, headers });
     };
-    return fetch(url, { ...options, headers });
+    const resp = await send();
+    if (resp.status === 401) {
+      // Token revoked or expired server-side: drop it, log in again and retry once.
+      this.accessToken = null;
+      return send();
+    }
+    return resp;
+  }
+
+  // Concurrent callers share one login instead of each authenticating separately.
+  private async ensureAuthenticated(): Promise<void> {
+    if (this.accessToken && Date.now() < this.accessToken.expiration.getTime() - TOKEN_EXPIRY_MARGIN_MS) {
+      return;
+    }
+    if (!this.authPromise) {
+      this.authPromise = this.authenticate().finally(() => {
+        this.authPromise = null;
+      });
+    }
+    return this.authPromise;
   }
 
   private async authenticate(): Promise<void> {

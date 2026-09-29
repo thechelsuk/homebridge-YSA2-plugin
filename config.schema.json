@@ -27,7 +27,29 @@
         "title": "Refresh Interval",
         "type": "number",
         "required": true,
-        "default": 10
+        "default": 10,
+        "minimum": 1,
+        "description": "Seconds between polls of the Yale API (minimum 1)."
+      },
+      "partialArmMode": {
+        "title": "Part-arm (\"Home\") shows as",
+        "type": "string",
+        "default": "stay",
+        "oneOf": [
+          {
+            "title": "Home (Stay)",
+            "enum": [
+              "stay"
+            ]
+          },
+          {
+            "title": "Night",
+            "enum": [
+              "night"
+            ]
+          }
+        ],
+        "description": "Yale has one part-arm mode (the zones set in the Yale app). Choose which HomeKit mode it is exposed as; the other is hidden."
       }
     }
   }

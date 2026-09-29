@@ -27,8 +27,12 @@ describe('modeToCurrentState', () => {
     expect(modeToCurrentState(Characteristic, PanelState.Disarmed)).toBe(Characteristic.SecuritySystemCurrentState.DISARMED);
   });
 
-  it('maps Home to NIGHT_ARM', () => {
-    expect(modeToCurrentState(Characteristic, PanelState.Home)).toBe(Characteristic.SecuritySystemCurrentState.NIGHT_ARM);
+  it('maps Home to STAY_ARM by default', () => {
+    expect(modeToCurrentState(Characteristic, PanelState.Home)).toBe(Characteristic.SecuritySystemCurrentState.STAY_ARM);
+  });
+
+  it('maps Home to NIGHT_ARM when part-arm is configured as night', () => {
+    expect(modeToCurrentState(Characteristic, PanelState.Home, 'night')).toBe(Characteristic.SecuritySystemCurrentState.NIGHT_ARM);
   });
 
   it('returns DISARMED for unknown state', () => {
@@ -37,6 +41,10 @@ describe('modeToCurrentState', () => {
 });
 
 describe('targetStateToMode', () => {
+  it('maps NIGHT_ARM to Home (part-arm), not Disarmed', () => {
+    expect(targetStateToMode(Characteristic, Characteristic.SecuritySystemTargetState.NIGHT_ARM)).toBe(PanelState.Home);
+  });
+
   it('maps STAY_ARM to Home', () => {
     expect(targetStateToMode(Characteristic, Characteristic.SecuritySystemTargetState.STAY_ARM)).toBe(PanelState.Home);
   });
