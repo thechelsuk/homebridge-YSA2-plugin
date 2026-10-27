@@ -1,6 +1,6 @@
 {
 	"name": "homebridge-ysa2",
-	"version": "2.5.1",
+	"version": "2.5.2",
 	"description": "Homebridge plugin for the Yale Sync Alarm system built for Homebridge 2.0+",
 	"main": "./dist/index.js",
 	"types": "./dist/index.d.ts",
@@ -33,6 +33,16 @@
 		"url": "https://github.com/thechelsuk/homebridge-YSA2-plugin/issues"
 	},
 	"homepage": "https://github.com/thechelsuk/homebridge-YSA2-plugin#readme",
+	"funding": [
+		{
+			"type": "github",
+			"url": "https://github.com/sponsors/thechelsuk"
+		},
+		{
+			"type": "ko-fi",
+			"url": "https://ko-fi.com/thechelsuk"
+		}
+	],
 	"engines": {
 		"homebridge": "^1.6.0 || ^2.0.0",
 		"node": ">=18.0.0"
