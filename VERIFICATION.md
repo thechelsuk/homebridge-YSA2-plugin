@@ -4,7 +4,7 @@ First checked on 2026-10-29 against `homebridge-ysa2@2.5.2`. Updated on 2026-11-
 
 ## Verdict
 
-**Ready to submit.** The blocking fix (`config.schema.json` missing from the npm package) is live in `homebridge-ysa2@2.5.3`, npm `latest` since 2026-11-12 23:20 UTC. The npm tarball has 28 files including `config.schema.json`, signed SLSA provenance, and the same shasum (`7e19f05b…`) as the v2.5.3 GitHub release build.
+**Submitted; waiting for 2.5.5 on npm.** The verification request is open. Its automated checks failed on three points, all fixed in 2.5.5 (see "Bot checks on the request" below). 2.5.5 is tagged, released on GitHub and staged on npm. It needs your 2FA approval, after which npm and GitHub both show 2.5.5.
 
 Every other required criterion passes. Criterion 5 (Node 22, 24 and 26) now passes in CI.
 
@@ -16,12 +16,21 @@ Every other required criterion passes. Criterion 5 (Node 22, 24 and 26) now pass
 | Tests on Node 22, 24, 26 | ✅ [Test run 43325088622](https://github.com/thechelsuk/homebridge-ysa2/actions/runs/43325088622) |
 | Tag and GitHub release | ✅ [v2.5.3](https://github.com/thechelsuk/homebridge-ysa2/releases/tag/v2.5.3). The attached `homebridge-ysa2-2.5.3.tgz` contains `package/config.schema.json` |
 | npm publish | ✅ The first staging attempt ([run 43325088714](https://github.com/thechelsuk/homebridge-ysa2/actions/runs/43325088714)) failed with E401 because the npm trusted publisher still named the old repo. After you fixed it, [run 43327646017](https://github.com/thechelsuk/homebridge-ysa2/actions/runs/43327646017) staged 2.5.3, and you approved it with 2FA. `npm view homebridge-ysa2 version` → `2.5.3` |
-| Verification request | ⏳ Drafted below, not opened |
+| Verification request | ✅ Opened by Mat. The bot reported 3 failed checks, all fixed in 2.5.5 |
+
+**Bot checks on the request (2026-11-12)**
+
+| Bot check | Fix |
+| --- | --- |
+| `keywords` must include `supports-hap` or `supports-matter` | Added `supports-hap` in `f670a8f`. HAP only, no Matter. |
+| Version mismatch: npm v2.5.3, GitHub `package.json` v2.5.4 | 2.5.4 (dev-only dependency overrides for Dependabot alerts 58 and 61) was staged but never approved. 2.5.5 is staged now ([run 43329946756](https://github.com/thechelsuk/homebridge-ysa2/actions/runs/43329946756)). Approving it makes npm match GitHub. |
+| `config.schema.json`: `required` must not be a boolean on individual fields | Moved to an object-level `"required": ["name", "username", "password", "refreshInterval"]` in `f670a8f`. `test/PackageMetadata.test.ts` checks this and the keywords. |
 
 **What's left (Mat)**
 
-1. Open the verification request at https://github.com/homebridge/plugins/issues/new/choose → "Plugin Verification Request", using the text under "What to paste into the request form". Optionally, first check in the Homebridge UI that 2.5.3 shows the Settings screen, and add a line saying so to "More Information".
-2. After that, ship the held dev-only dependency overrides (minimatch 11.0.8 and glob 14.0.6, for Dependabot alerts 58 and 61) with the next version bump, 2.5.4. The deepmerge alerts (56 and 59) have no upstream fix.
+1. On npmjs.com, approve the staged **2.5.5** with 2FA. You can skip 2.5.4: 2.5.5 includes it, and npm will still list 2.5.4 if you approve it as well.
+2. Check that `npm view homebridge-ysa2 version --prefer-online` shows `2.5.5`.
+3. Ask the bot to check again, by re-running it or commenting on the request issue, whichever the issue says. In the "More Information" text, the version is now 2.5.5.
 
 ## Sources used
 
@@ -146,7 +155,7 @@ homebridge-ysa2 exposes a Yale Sync Smart Home Alarm / Yale Smart Home Alarm (UK
 - Polling and all HomeKit get/set handlers catch and log their errors; failures show as "No Response" in Home rather than crashing Homebridge.
 - The static Basic token in src/yale/YaleApiClient.ts is Yale's app client identifier used for the OAuth password grant, not a user credential; the user's own Yale login comes from config.
 - Tested in CI on Node 22, 24 and 26 for every push: https://github.com/thechelsuk/homebridge-ysa2/actions/workflows/test.yml
-- Each new version gets a GitHub release with notes and is published to npm from CI (trusted publishing, with provenance). Latest: 2.5.3.
+- Each new version gets a GitHub release with notes and is published to npm from CI (trusted publishing, with provenance). Latest: 2.5.5.
 ```
 
 Before you paste it, check that each claim still holds for the version you release. The text doesn't claim a live Homebridge 2 run, because none was done here. Add a line once you've checked it in the Homebridge UI, including that the Settings screen appears for 2.5.3.
