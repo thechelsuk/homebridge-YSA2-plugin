@@ -1,4 +1,4 @@
-# homebridge-ysa2-plugin - Homebridge 2 support for Yale Sync Alarms
+# homebridge-ysa2 - Homebridge 2 support for Yale Sync Alarms
 
 Homebridge plugin for the [Yale Sync Smart Home Alarm](https://www.yale.co.uk/en/yale/couk/products/smart-living/smart-home-alarms/sync-smart-alarm/) and [Yale Smart Home Alarm](https://www.yale.co.uk/en/yale/couk/products/smart-living/smart-home-alarms/smart-home-alarm-starter-kit/).
 
@@ -45,9 +45,9 @@ Add in your username and password. In Yale you can create a secondary user.
 ## Building from Source
 
 ```bash
-git clone https://github.com/thechelsuk/homebridge-ysa2-plugin.git
-&& cd homebridge-ysa2-plugin
-&& npm install
+git clone https://github.com/thechelsuk/homebridge-ysa2.git
+cd homebridge-ysa2
+npm install
 ```
 
 ## Notes
