@@ -4,7 +4,7 @@ First checked on 2026-10-29 against `homebridge-ysa2@2.5.2`. Updated on 2026-11-
 
 ## Verdict
 
-**Submitted; waiting for 2.5.5 on npm.** The verification request is open. Its automated checks failed on three points, all fixed in 2.5.5 (see "Bot checks on the request" below). 2.5.5 is tagged, released on GitHub and staged on npm. It needs your 2FA approval, after which npm and GitHub both show 2.5.5.
+**Submitted; automated checks passed (2026-11-12).** `homebridge-ysa2@2.5.5` is live on npm (`latest`) and matches GitHub. The bot re-ran and reported that all checks passed. The Homebridge team now reviews the plugin by hand. Nothing else is needed unless they ask for changes. The three earlier bot failures and their fixes are under "Bot checks on the request".
 
 Every other required criterion passes. Criterion 5 (Node 22, 24 and 26) now passes in CI.
 
@@ -26,11 +26,10 @@ Every other required criterion passes. Criterion 5 (Node 22, 24 and 26) now pass
 | Version mismatch: npm v2.5.3, GitHub `package.json` v2.5.4 | 2.5.4 (dev-only dependency overrides for Dependabot alerts 58 and 61) was staged but never approved. 2.5.5 is staged now ([run 43329946756](https://github.com/thechelsuk/homebridge-ysa2/actions/runs/43329946756)). Approving it makes npm match GitHub. |
 | `config.schema.json`: `required` must not be a boolean on individual fields | Moved to an object-level `"required": ["name", "username", "password", "refreshInterval"]` in `f670a8f`. `test/PackageMetadata.test.ts` checks this and the keywords. |
 
-**What's left (Mat)**
+**What's left**
 
-1. On npmjs.com, approve the staged **2.5.5** with 2FA. You can skip 2.5.4: 2.5.5 includes it, and npm will still list 2.5.4 if you approve it as well.
-2. Check that `npm view homebridge-ysa2 version --prefer-online` shows `2.5.5`.
-3. Ask the bot to check again, by re-running it or commenting on the request issue, whichever the issue says. In the "More Information" text, the version is now 2.5.5.
+- Wait for the Homebridge team's manual review, and answer any questions they post on the request issue.
+- The two deepmerge Dependabot alerts (56 and 59) stay open until there's an upstream fix. It's a dev-only dependency.
 
 ## Sources used
 
