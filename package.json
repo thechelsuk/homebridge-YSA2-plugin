@@ -63,9 +63,13 @@
 		"typescript": "^6.0.3"
 	},
 	"overrides": {
-		"js-yaml": "3.15.2"
+		"js-yaml": "3.15.2",
+		"minimatch": "11.0.8",
+		"glob": "14.0.6"
 	},
 	"resolutions": {
-		"js-yaml": "3.15.2"
+		"js-yaml": "3.15.2",
+		"minimatch": "11.0.8",
+		"glob": "14.0.6"
 	}
 }
