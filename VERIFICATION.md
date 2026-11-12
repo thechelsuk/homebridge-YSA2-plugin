@@ -1,18 +1,45 @@
 # Homebridge Verified Plugin: readiness check for `homebridge-ysa2`
 
-Checked on 2026-10-29 against `homebridge-ysa2@2.5.2` (npm `latest`) and this working copy on `main`.
+First checked on 2026-10-29 against `homebridge-ysa2@2.5.2`. Updated on 2026-11-12 for the 2.5.3 release and the criteria as updated on 2026-11-01.
 
 ## Verdict
 
-**Ready after the fixes listed below.** One item blocks submission. The published 2.5.2 package on npm does not include `config.schema.json`, so the Homebridge UI cannot show a Settings screen for people who install it. This is fixed in the working copy (see "Changes made"), but it only reaches users once a new version (for example 2.5.3) is released. Release that version before you submit the request.
+**Ready once 2.5.3 is live on npm.** The blocking fix (`config.schema.json` missing from the npm package) is released as v2.5.3: the tag and GitHub release exist, and the release tarball includes `config.schema.json`. But 2.5.3 is **not on npm yet**. The CI staging step failed with `E401 Unable to authenticate`, so npm `latest` is still 2.5.2, which has no schema. Don't submit the request until 2.5.3 is live on npm. See "Status on 2026-11-12" below.
 
-Every other required criterion passes, or is "unsure" only because it couldn't be tested here (Node 22 and 24).
+Every other required criterion passes. Criterion 5 (Node 22, 24 and 26) now passes in CI.
+
+## Status on 2026-11-12
+
+| Step | State |
+| --- | --- |
+| Fix committed and pushed | ✅ `49eb508` (files fix, displayName, README), `dd170e9` (CI tests on Node 26), `d2969f3` (release 2.5.3) |
+| Tests on Node 22, 24, 26 | ✅ [Test run 43325088622](https://github.com/thechelsuk/homebridge-ysa2/actions/runs/43325088622) |
+| Tag and GitHub release | ✅ [v2.5.3](https://github.com/thechelsuk/homebridge-ysa2/releases/tag/v2.5.3). The attached `homebridge-ysa2-2.5.3.tgz` contains `package/config.schema.json` |
+| npm publish (staged) | ❌ [CICD run 43325088714](https://github.com/thechelsuk/homebridge-ysa2/actions/runs/43325088714) failed at "Stage release on NPM": `npm error code E401 … your authentication token seems to be invalid` |
+| Verification request | ⏳ Drafted below, not opened |
+
+**Why the publish failed (most likely).** 2.5.2 was staged on 2026-10-27 by the same workflow through npm trusted publishing (OIDC, with signed provenance). Since then the GitHub repo was renamed from `homebridge-YSA2-plugin` to `homebridge-ysa2`. An npm trusted publisher is tied to the exact owner, repository and workflow file, so if the entry on npmjs.com still names the old repo, npm rejects the OIDC token. This wasn't checked on npmjs.com, because that needs your sign-in.
+
+**What you need to do (Mat)**
+
+1. On npmjs.com, open `homebridge-ysa2` → Settings → Trusted Publisher. Set the repository to `thechelsuk/homebridge-ysa2` and the workflow to `release.yml`. Save.
+2. Re-run the release. It skips the existing tag and release and only stages to npm:
+
+   ```bash
+   gh workflow run release.yml -R thechelsuk/homebridge-ysa2
+   ```
+
+3. Approve the staged 2.5.3 with 2FA, either on the package's staged-versions page on npmjs.com or with `npm stage approve` (check `npm stage --help` for the exact arguments).
+4. Confirm: `npm view homebridge-ysa2 version` shows `2.5.3`, and `npm pack homebridge-ysa2@2.5.3 --dry-run 2>&1 | grep config.schema` prints the schema.
+5. Open the verification request with the text under "What to paste into the request form".
+
+If step 2 still gives E401, the repo also has an `NPM_TOKEN` secret (set 2026-06-01), but the workflow doesn't use it and the trusted-publisher route worked for 2.5.2, so fix the trusted publisher rather than switching to the token.
 
 ## Sources used
 
 | Source | URL |
 | --- | --- |
-| Verification criteria (wiki, "Current Requirements", last updated 2026-05-05) | https://github.com/homebridge/plugins/wiki/Verified-Plugins |
+| Verification criteria (wiki, "Current Requirements", last updated 2026-11-01) | https://github.com/homebridge/plugins/wiki/Verified-Plugins |
 | How to request verification (README) | https://github.com/homebridge/plugins |
 | Request form (issue template) | https://raw.githubusercontent.com/homebridge/plugins/latest/.github/ISSUE_TEMPLATE/1_verification-request.yml |
 | Old wiki page (now just points to the plugins repo) | https://github.com/homebridge/homebridge/wiki/Verified-Plugins |
@@ -30,11 +57,11 @@ The 12 criteria are copied from the wiki. Line numbers refer to this working cop
 | 2 | Must not offer the same or less functionality than an existing verified plugin | ✅ Pass (by name only) | No plugin with "yale" in its name is in the verified index on the wiki page. The index lists names only, with no descriptions, so a verified plugin covering Yale under another name can't be ruled out. Verified security plugins found by name (alarm-dot-com, simplisafe3, qolsys, jablotron and others) cover other brands. |
 | 3 | Published to npm, source on GitHub, **issues enabled** | ✅ Pass | npm `homebridge-ysa2` `latest` = 2.5.2. GitHub `thechelsuk/homebridge-ysa2` (renamed from homebridge-YSA2-plugin; the old URL redirects): `hasIssuesEnabled: true`, not archived (checked with `gh repo view`). `package.json` `repository` and `bugs` point to it. |
 | 4 | A GitHub release with release notes for every new version | ⚠️ Pass going forward, gaps in history | `.github/workflows/release.yml` creates a tagged release with notes for each version bump. Releases exist for v2.1.1, v2.2.5, v2.2.6, v2.4.1 to v2.5.2. **No release** for npm versions 2.0.6 (and its betas), 2.1.0, 2.2.0, 2.2.2, 2.2.3, 2.2.4 (tags v2.2.3 and v2.2.4 exist without releases). The wording is "should", and recent versions comply. Release notes are the last commit message, which can be thin. There is no CHANGELOG file. |
-| 5 | Runs on all supported Node LTS versions (**22 and 24**) | ❓ Unsure | Tests (60/60) and `require('./dist/index.js')` pass on **Node 26.0.0** only. Node 22 isn't installed here, and `node@24` on this Mac is a symlink to 26. The release workflow builds on Node 24 but doesn't run tests. The code needs Node ≥ 18 (global `fetch`, `src/yale/YaleApiClient.ts:29`), and nothing found is version-specific, so likely fine. `engines.node` is `>=18.0.0` (`package.json:50`). |
+| 5 | Runs on all supported Node LTS versions (**22, 24 and 26**; the wiki added 26 on 2026-11-01) | ✅ Pass | `.github/workflows/test.yml` runs `npm ci`, `npm run build` and `npm test` on Node 22, 24 and 26 for every push and PR. All passed for 2.5.3: [run 43325088622](https://github.com/thechelsuk/homebridge-ysa2/actions/runs/43325088622). Locally, 60/60 tests also pass on Node 26.0.0. |
 | 6 | Installs, and **does not start unless configured** | ✅ Pass | If config fails to decode (missing username, password or refreshInterval), the constructor logs one error and returns before registering `didFinishLaunching` (`src/YaleSyncPlatform.ts:37-43`), and `heartbeat`/`poll` return early when unconfigured (lines 89, 137). Checked by constructing the built platform with `{platform:'YaleSyncAlarm'}`: one `Invalid configuration` log, no listeners, no throw. |
 | 7 | No post-install scripts that modify the system | ✅ Pass | No `preinstall`/`install`/`postinstall` in `package.json`. `prepare` (build + husky) doesn't run when users install from the npm registry. The only runtime dependency, `type-safe-json-decoder@0.2.0`, has no install scripts and no dependencies. |
 | 8 | Doesn't need a TTY or non-standard startup parameters | ✅ Pass | Configured only through `config.json` or the UI. No prompts, no CLI flags. |
-| 9 | Implements the **Homebridge Plugin Settings GUI** | ❌ Fail on npm 2.5.2 / ✅ fixed locally | `config.schema.json` exists (alias `YaleSyncAlarm`, `singular: true`, fields name, username, password, refreshInterval, partialArmMode). But `package.json` `files` didn't list it, so it's **missing from the published tarball** (`npm pack homebridge-ysa2@2.5.2 --dry-run` lists 27 files, no schema). Fixed in this working copy; `npm pack --dry-run` now includes `config.schema.json`. A new release is needed. |
+| 9 | Implements the **Homebridge Plugin Settings GUI** | ❌ Fail on npm 2.5.2 / ✅ fixed in 2.5.3 (not on npm yet) | `config.schema.json` exists (alias `YaleSyncAlarm`, `singular: true`, fields name, username, password, refreshInterval, partialArmMode). But `package.json` `files` didn't list it, so it's **missing from the published tarball** (`npm pack homebridge-ysa2@2.5.2 --dry-run` lists 27 files, no schema). Fixed in `49eb508`. `npm pack --dry-run` lists 28 files including `config.schema.json`, and so does the v2.5.3 GitHub release tarball. Passes once 2.5.3 is on npm. |
 | 10 | No analytics or user tracking | ✅ Pass | The only network host is `https://mob.yalehomesystem.co.uk/yapi/` (`src/yale/YaleApiClient.ts:6`), used for login, panel mode and device status. A grep of `src/` and `index.ts` found no other URLs. |
 | 11 | Files written to disk go in the Homebridge storage directory | ✅ Pass (n/a) | Writes no files. No `fs` usage in `src/`. |
 | 12 | No unhandled exceptions; catch and log its own errors | ✅ Pass | The polling loop catches and logs every error and retries (`src/YaleSyncPlatform.ts:92-99`). The `heartbeat` promise has a `.catch` (line 48). HomeKit get/set handlers catch, log and throw a `HapStatusError` (`SERVICE_COMMUNICATION_FAILURE`), which shows "No Response" instead of crashing (lines 127-133 and 235-238, 258-261, 295-298, 306-309, 321-324). Config decode is wrapped in try/catch (lines 37-43). |
@@ -56,21 +83,21 @@ The 12 criteria are copied from the wiki. Line numbers refer to this working cop
 | `npm audit --omit=dev` | ✅ | 0 vulnerabilities |
 | Supported transport keywords | Optional | The README describes `supports-hap` / `supports-matter` keywords. They aren't required for verification. If you add `supports-hap`, don't add `supports-matter` (this plugin doesn't register Matter accessories). |
 
-## Changes made in this working copy (uncommitted)
+## Changes made
 
 1. `package.json` `files`: replaced `".tsconfig.json"` (no such file exists, so it matched nothing) with `"config.schema.json"`, so the Settings GUI schema ships to npm. **This is the blocking fix.**
 2. `package.json`: added `"displayName": "Homebridge YSA2 (Yale Sync Alarm)"`. Change the wording if you prefer.
 3. `README.md` "Installation": the command said `npm install -g homebridge-ysa2-plugin`, which is not the npm package name. It now says `npm install -g homebridge-ysa2` and mentions installing and configuring through the Homebridge UI.
 4. Added this file, `VERIFICATION.md`. You may not want it in the published package. It isn't in `files`, so it won't be published, but you may prefer not to commit it.
 
-Nothing was committed, pushed or published.
+Items 1 to 4 were committed in `49eb508`. On 2026-11-12, Node 26 was added to the test matrix (`dd170e9`) and the version was bumped to 2.5.3 (`d2969f3`), with release notes as the commit message.
 
 ## Fixes still needed before submitting
 
 **Required**
 
-1. **Release a new version** (for example 2.5.3) with the `files` fix, then check that the package includes the schema: `npm pack homebridge-ysa2@<new> --dry-run | grep config.schema`. Release that version before you submit.
-2. **Confirm Node 22 and 24.** `.github/workflows/test.yml` (added, uncommitted) runs `npm ci`, `npm run build` and `npm test` on Node 22 and 24 for every push to main and every PR. Once it passes on GitHub, mark criterion 5 as a pass and add the run link to the form.
+1. **Get 2.5.3 onto npm.** The tag and GitHub release are done. The npm staging step failed (see "Status on 2026-11-12"). Fix the trusted publisher, re-run the workflow, approve with 2FA, then check `npm pack homebridge-ysa2@2.5.3 --dry-run | grep config.schema`.
+2. ~~Confirm Node 22 and 24.~~ Done: tests pass on Node 22, 24 and 26 in CI.
 
 **Recommended (likely review feedback, not hard criteria)**
 
@@ -130,7 +157,8 @@ homebridge-ysa2 exposes a Yale Sync Smart Home Alarm / Yale Smart Home Alarm (UK
 - Only network calls are to Yale's own API (mob.yalehomesystem.co.uk). No analytics, no files written to disk, no install scripts.
 - Polling and all HomeKit get/set handlers catch and log their errors; failures show as "No Response" in Home rather than crashing Homebridge.
 - The static Basic token in src/yale/YaleApiClient.ts is Yale's app client identifier used for the OAuth password grant, not a user credential; the user's own Yale login comes from config.
-- Each new version gets a GitHub release with notes and is published to npm from CI. Latest: 2.5.3.
+- Tested in CI on Node 22, 24 and 26 for every push: https://github.com/thechelsuk/homebridge-ysa2/actions/workflows/test.yml
+- Each new version gets a GitHub release with notes and is published to npm from CI (trusted publishing, with provenance). Latest: 2.5.3.
 ```
 
-Before you paste it, check that each claim still holds for the version you release. The text doesn't claim Node 22/24 testing or a live Homebridge 2 run, because neither was confirmed here. Add a line for each once you have checked it.
+Before you paste it, check that each claim still holds for the version you release. The text doesn't claim a live Homebridge 2 run, because none was done here. Add a line once you've checked it in the Homebridge UI, including that the Settings screen appears for 2.5.3.
