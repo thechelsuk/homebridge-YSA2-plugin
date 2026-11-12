@@ -4,29 +4,31 @@
   "singular": true,
   "schema": {
     "type": "object",
+    "required": [
+      "name",
+      "username",
+      "password",
+      "refreshInterval"
+    ],
     "properties": {
       "name": {
         "title": "Name",
         "type": "string",
-        "required": true,
         "default": "Burglar Alarm"
       },
       "username": {
         "title": "Username",
         "type": "string",
-        "required": true,
         "placeholder": "Your Yale username"
       },
       "password": {
         "title": "Password",
         "type": "string",
-        "required": true,
         "placeholder": "Your Yale password"
       },
       "refreshInterval": {
         "title": "Refresh Interval",
         "type": "number",
-        "required": true,
         "default": 10,
         "minimum": 1,
         "description": "Seconds between polls of the Yale API (minimum 1)."
