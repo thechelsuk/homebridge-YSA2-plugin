@@ -14,7 +14,13 @@ This plugin pairs very nicely with the Dummy homebridge switch. Apple does not a
 
 ## Installation
 
-`npm install -g homebridge-ysa2-plugin`
+Search for "YSA2" in the Homebridge UI **Plugins** tab, or run:
+
+```bash
+npm install -g homebridge-ysa2
+```
+
+Then configure it from the plugin's **Settings** in the Homebridge UI, or edit `config.json` as below.
 
 ## Configuration
 
