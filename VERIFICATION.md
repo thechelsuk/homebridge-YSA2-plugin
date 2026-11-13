@@ -4,7 +4,7 @@ First checked on 2026-10-29 against `homebridge-ysa2@2.5.2`. Updated on 2026-11-
 
 ## Verdict
 
-**Submitted; automated checks passed (2026-11-12).** `homebridge-ysa2@2.5.5` is live on npm (`latest`) and matches GitHub. The bot re-ran and reported that all checks passed. The Homebridge team now reviews the plugin by hand. Nothing else is needed unless they ask for changes. The three earlier bot failures and their fixes are under "Bot checks on the request".
+**Verified by Homebridge (2026-11-13).** `homebridge-ysa2` is on the [Verified Plugins](https://github.com/homebridge/homebridge/wiki/Verified-Plugins) list, and the README shows the verified badge. Version 2.5.5 passed the automated checks on 2026-11-12, and the Homebridge team then reviewed it by hand. The three earlier bot failures and their fixes are under "Bot checks on the request".
 
 Every other required criterion passes. Criterion 5 (Node 22, 24 and 26) now passes in CI.
 
